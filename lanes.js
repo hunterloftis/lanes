@@ -1,5 +1,6 @@
 const net = require('net')
 const cluster = require('cluster')
+const debug = require('util').debuglog('lanes')
 
 module.exports = (laneID = 'default') => {
   const joinMsg = `lanes-${laneID}:join`
@@ -14,18 +15,23 @@ module.exports = (laneID = 'default') => {
     if (worker) {
       worker.send(connectionMsg, connection)
     }
+    else {
+      debug('No worker available for connection')
+    }
   }
 
   function listen(...args) {
     cluster
       .on('message', (worker, msg, handle) => {
         if (msg === joinMsg) {
+          debug(`Worker ${workers.length} joined`)
           workers.push(worker)
         }
       })
       .on('disconnect', (worker) => {
         const index = workers.indexOf(worker)
         if (index != -1) {
+          debug(`Worker ${index} disconnected`)
           workers.splice(index, 1)
         }
       })
@@ -50,6 +56,8 @@ module.exports = (laneID = 'default') => {
         s += ip[i]
       }
     }
-    return workers[Number(s) % workers.length]
+    const index = Number(s) % workers.length
+    debug(`Routing ${ ip } to ${ index }`)
+    return workers[index]
   }
 }
